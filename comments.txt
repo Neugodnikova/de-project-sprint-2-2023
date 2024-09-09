@@ -1,0 +1,74 @@
+08.09.2024 - требует доработки 11 комментарий
+Было:  LEFT JOIN dwh.customer_report_datamart crd ON dc.customer_id = crd.customer_id
+Стало:
+
+
+CREATE temp_sources dimension.sql
+
+1.
+DROP TABLE IF EXISTS tmp_sources;
+Да, для того чтобы данные при перезапуске дага были обновлены полностью нужно добавить очистку таблицы от данных. Это можно сделать через операторы DELETE (в этом случае таблица останется, но её содержимое будет удалено), TRUNCATE (для очистки таблицы от всех данных с сохранение структуры таблицы) или DROP (таблица будет удалена). Выбор в пользу того или иного оператора зависит от того сколько времени занимает удаление таблицы. Например,  если запись данных идёт 10 минут, то мы на 10 минут лишаемся данных и в таких случаях всё делают через темповую таблицу. Также следует отметить различия между операторами DELETE и TRUNCATE. Оператор TRUNCATE аналогичен оператору DELETE применяемом без оператора WHERE. Основные отличия:
+* Оператор SQL TRUNCATE не ведет запись об удаленных данных в журнал событий.
+* DELETE осуществляет блокировку построчно, оператор TRUNCATE по всей странице целиком. Вследствие этого, оператор SQL TRUNCATE не возвращает никакого значения, SQL DELETE же, возвращает количество удаленных строк.
+* После применения оператора DELETE возможно сделать откат операции и восстановить удаленные данные (команда ROLLBACK). При применении оператора TRUNCATE этого сделать нельзя, однако в СУБД MS SQL Server, оператор может применяться в транзакциях.
+
+2. 
+JOIN external_source.customers c ON co.customer_id = c.customer_id; 
+объединение данных из источников выполнено правильно
+
+3.
+USING (SELECT DISTINCT craftsman_name, craftsman_address, craftsman_birthday, craftsman_email FROM tmp_sources) t 
+да, DISTINCT здесь пригодится)
+
+4.
+VALUES (t.customer_name, t.customer_address, t.customer_birthday, t.customer_email, current_timestamp); 
+обновление существующих записей и добавление новых выполнено
+
+CREATE temp_sources fact.sql
+5.
+DROP TABLE IF EXISTS tmp_sources; 
+да, нужно выполнить очистку данных
+
+6.
+VALUES (t.product_id, t.craftsman_id, t.customer_id, t.order_created_date, t.order_completion_date, t.order_status, current_timestamp); 
+ок
+
+DDL dwh customer_report_datamart.sql
+7.
+DROP TABLE IF EXISTS dwh.customer_report_datamart; 
+отлично, обновление данных выполнено
+
+8. 
+CONSTRAINT customer_report_datamart_pk PRIMARY KEY (id) 
+да, поля и их тип заданы верно
+
+9.
+CREATE TABLE IF NOT EXISTS dwh.load_dates_customer_report_datamart ( 
+Отлично, что используешь IF NOT EXISTS при создании таблицы. В этом случае если таблица уже создана, то скрипт не упадёт с ошибкой.
+
+DDL dwh f_order.sql
+10.
+COMMENT ON COLUMN dwh.f_order.load_dttm IS 'Дата и время загрузки записи';
+Молодец, что добавила комментарии. Это довольно хорошая практика:)
+
+DDL dwh load_dates_customer_report_datamart.sql
+11.
+LEFT JOIN dwh.customer_report_datamart crd ON dc.customer_id = crd.customer_id
+Проверь, пожалуйста, все ли данные добавлены? Ещё нужно добавить данные из dwh.d_craftsman.
+
+12. 
+dwh_update_delta AS ( -- Выборка заказчиков, по которым были изменения в DWH
+условия фильтрации заданы верно
+
+13. 
+RANK() OVER(PARTITION BY T2.customer_id ORDER BY count_product DESC) AS rank_count_product
+отлично, ранжирование выполнено
+Дополнительно по оконным функциям можно посмотреть: https://tproger.ru/translations/sql-window-functions/ 
+
+14. 
+T1.report_period AS report_period 
+вычисляемые поля добавлены
+
+15. 
+SELECT CURRENT_DATE; 
+ок)
