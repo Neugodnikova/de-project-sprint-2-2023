@@ -1,7 +1,4 @@
 08.09.2024 - требует доработки 11 комментарий
-Было:  LEFT JOIN dwh.customer_report_datamart crd ON dc.customer_id = crd.customer_id
-Стало:
-
 
 CREATE temp_sources dimension.sql
 
